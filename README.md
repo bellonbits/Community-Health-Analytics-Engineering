@@ -1,89 +1,253 @@
-Community Health Analytics Engineering Project
-Project Overview
+# Community Health Analytics Engineering Project
+
+## Project Overview
+
 This project is a complete data analytics engineering pipeline designed to collect, process, and analyze community health data. The goal is to provide a unified, structured, and accessible data source for health administrators to monitor key metrics, evaluate program performance, and make data-driven decisions.
 
 The pipeline automates the entire data lifecycle, from ingesting raw data from a mobile application API and CSV files to loading it into a structured data warehouse for business intelligence and visualization.
 
-Architecture
+## Architecture
+
 The project's architecture is built on a modern data stack, orchestrated by Apache Airflow.
 
-Data Sources: Data is collected from two primary sources:
+### Components
 
-Mobile API Logs: Operational data from a mobile application used by Community Health Workers (CHWs).
+1. **Data Sources**
+   - **Mobile API Logs:** Operational data from a mobile application used by Community Health Workers (CHWs)
+   - **Static CSV Files:** Structured data on CHWs, households, and visits
 
-Static CSV Files: Structured data on CHWs, households, and visits.
+2. **Orchestration (Apache Airflow)**
+   - Manages and schedules data pipelines
+   - Ensures daily data fetching and processing
+   - Provides workflow monitoring and alerting
 
-Orchestration (Airflow): Apache Airflow manages and schedules the data pipelines, ensuring that data is fetched and processed on a daily basis.
+3. **Storage Layer**
+   - **MinIO:** Temporary object storage for raw CSV files
+   - **PostgreSQL:** Staging database for mobile API logs before warehouse loading
 
-Storage:
+4. **Data Warehousing (Snowflake)**
+   - Central data warehouse with star schema design
+   - **Fact Table:** `CHW_VISITS_FACT`
+   - **Dimension Tables:** `CHW_DIM`, `HOUSEHOLD_DIM`
 
-MinIO: Serves as a temporary object storage for raw CSV files.
+5. **Visualization & Monitoring**
+   - **Power BI:** Business intelligence dashboards and reporting
+   - **Grafana:** Real-time monitoring of operational logs and application performance
 
-PostgreSQL: A staging database for mobile API logs before they are loaded into the data warehouse.
+## File Structure
 
-Data Warehousing (Snowflake): The central data warehouse where data is structured into a star schema for optimal analytics performance.
-
-Fact Table: CHW_VISITS_FACT
-
-Dimension Tables: CHW_DIM, HOUSEHOLD_DIM
-
-Visualization & Monitoring:
-
-Power BI: Used for high-level business intelligence dashboards and reporting.
-
-Grafana: Used for real-time monitoring of operational logs and application performance.
-
-File Structure
+```
 community-health-analytics/
 ├── .gitignore
 ├── dags/
-│   ├── chw_data_minio.py
-│   └── mobile_pipeline.py
+│   ├── chw_data_minio.py          # DAG for CSV ingestion to MinIO
+│   └── mobile_pipeline.py         # DAG for mobile API log ingestion
 ├── scripts/
-│   ├── fetch_mobile_logs.py
-│   ├── load_to_snowflake.py
-│   └── upload_csv_to_minio.py
+│   ├── fetch_mobile_logs.py       # Fetches data from mobile API
+│   ├── load_to_snowflake.py       # ELT process to Snowflake
+│   └── upload_csv_to_minio.py     # Uploads CSV files to MinIO
 └── sql/
-    └── snowflake_schema.sql
+    └── snowflake_schema.sql       # Star schema definitions
+```
 
-Prerequisites
-A virtual machine (VM) to run Airflow and MinIO.
+## Prerequisites
 
-Access to a PostgreSQL instance.
+### Infrastructure
+- Virtual Machine (VM) for running Airflow and MinIO
+- PostgreSQL instance access
+- Snowflake data warehouse with configured user and role
 
-Access to a Snowflake data warehouse with a user and role configured.
+### Python Libraries
+```bash
+apache-airflow
+pandas
+requests
+sqlalchemy
+psycopg2
+boto3
+snowflake-connector-python
+```
 
-The following Python libraries installed: apache-airflow, pandas, requests, sqlalchemy, psycopg2, boto3, snowflake-connector-python.
+## Getting Started
 
-Getting Started
-1. Set up your Environment
-Clone this repository to your Airflow VM.
+### 1. Environment Setup
 
-Install the required Python libraries.
+Clone the repository to your Airflow VM:
+```bash
+git clone <repository-url>
+cd community-health-analytics
+```
 
-2. Configure Airflow Connections and Variables
-Snowflake: Configure a Snowflake connection in Airflow with the necessary credentials (account, user, password, warehouse, database, schema, role).
+Install required Python libraries:
+```bash
+pip install apache-airflow pandas requests sqlalchemy psycopg2 boto3 snowflake-connector-python
+```
 
-PostgreSQL: Configure a PostgreSQL connection.
+### 2. Configure Airflow Connections
 
-MinIO: Configure a MinIO connection.
+Configure the following connections in the Airflow UI under **Admin > Connections**:
 
-3. Place CSV Files
-Manually transfer your source CSV files (CHW_Master.csv, Households.csv, CHW_Visits.csv) to the designated local directory on your Airflow VM as specified in upload_csv_to_minio.py.
+#### Snowflake Connection
+- **Connection ID:** `snowflake_default`
+- **Connection Type:** Snowflake
+- **Account:** Your Snowflake account identifier
+- **User:** Snowflake username
+- **Password:** Snowflake password
+- **Warehouse:** Target warehouse name
+- **Database:** Target database name
+- **Schema:** Target schema name
+- **Role:** Snowflake role with appropriate permissions
 
-4. Run the DAGs
-The Airflow DAGs are scheduled to run daily. You can also manually trigger them from the Airflow UI to start the data ingestion process.
+#### PostgreSQL Connection
+- **Connection ID:** `postgres_default`
+- **Connection Type:** Postgres
+- **Host:** PostgreSQL host address
+- **Database:** Database name
+- **User:** PostgreSQL username
+- **Password:** PostgreSQL password
+- **Port:** 5432 (default)
 
-The mobile_pipeline.py DAG will run the fetch_mobile_logs.py script to get data from the API and store it in PostgreSQL.
+#### MinIO Connection
+- **Connection ID:** `minio_default`
+- **Connection Type:** AWS S3
+- **Extra:** JSON configuration with MinIO endpoint and credentials
 
-The chw_data_minio.py DAG will run the upload_csv_to_minio.py script to load the static CSV files into MinIO.
+### 3. Prepare Data Files
 
-The load_to_snowflake.py script (which you can run manually or integrate into its own DAG) will then pull the data from MinIO and Snowflake, performing the final ELT (Extract, Load, Transform) steps.
+Transfer your source CSV files to the Airflow VM:
+```bash
+scp CHW_Master.csv user@airflow-vm:/path/to/data/
+scp Households.csv user@airflow-vm:/path/to/data/
+scp CHW_Visits.csv user@airflow-vm:/path/to/data/
+```
 
-5. Manual Steps
-Move Files: Use scp to securely copy your local CSV files to the Airflow VM.
+Update the file paths in `upload_csv_to_minio.py` to match your directory structure.
 
-Visualize: Connect your Power BI instance to your Snowflake data warehouse to build your dashboards and reports.
+### 4. Initialize Snowflake Schema
 
-Author
-Peter Gatitu Mwangi - Data & Analytics Engineer
+Run the schema creation script in your Snowflake environment:
+```sql
+-- Execute sql/snowflake_schema.sql in Snowflake
+```
+
+### 5. Run the Data Pipelines
+
+#### Option A: Scheduled Execution
+The DAGs are configured to run daily automatically. Monitor progress in the Airflow UI.
+
+#### Option B: Manual Trigger
+1. Navigate to the Airflow UI
+2. Locate the following DAGs:
+   - `mobile_pipeline` - Fetches mobile API logs
+   - `chw_data_minio` - Uploads CSV files to MinIO
+3. Click the "Trigger DAG" button for each
+
+#### Option C: Manual Script Execution
+```bash
+# Fetch mobile logs
+python scripts/fetch_mobile_logs.py
+
+# Upload CSV files to MinIO
+python scripts/upload_csv_to_minio.py
+
+# Load data to Snowflake
+python scripts/load_to_snowflake.py
+```
+
+### 6. Connect Visualization Tools
+
+#### Power BI
+1. Open Power BI Desktop
+2. Select **Get Data > Database > Snowflake**
+3. Enter your Snowflake credentials
+4. Connect to the analytics database and schema
+5. Build dashboards using the fact and dimension tables
+
+#### Grafana
+1. Add Snowflake or PostgreSQL data source
+2. Create dashboards for operational monitoring
+3. Set up alerts for critical metrics
+
+## Data Pipeline Flow
+
+```
+Mobile API → fetch_mobile_logs.py → PostgreSQL → load_to_snowflake.py → Snowflake
+CSV Files → upload_csv_to_minio.py → MinIO → load_to_snowflake.py → Snowflake
+                                                                           ↓
+                                                                  Power BI / Grafana
+```
+
+## Monitoring and Maintenance
+
+### Airflow Monitoring
+- Monitor DAG runs in the Airflow UI
+- Check task logs for errors
+- Set up email alerts for failed tasks
+
+### Data Quality Checks
+- Validate row counts after each load
+- Check for null values in critical fields
+- Monitor data freshness timestamps
+
+### Troubleshooting
+- Check Airflow logs: `/path/to/airflow/logs/`
+- Verify connection credentials in Airflow UI
+- Ensure network connectivity to all data sources
+- Validate file permissions on the VM
+
+## Best Practices
+
+1. **Security**
+   - Store credentials in Airflow connections, not in code
+   - Use role-based access control in Snowflake
+   - Encrypt data in transit and at rest
+
+2. **Performance**
+   - Schedule DAGs during off-peak hours
+   - Implement incremental loading where possible
+   - Monitor warehouse credit usage in Snowflake
+
+3. **Data Governance**
+   - Document data lineage
+   - Maintain data dictionary
+   - Implement data retention policies
+
+## Future Enhancements
+
+- [ ] Implement data quality validation framework
+- [ ] Add automated testing for pipeline components
+- [ ] Create CI/CD pipeline for deployment
+- [ ] Implement incremental loading strategies
+- [ ] Add dbt for advanced transformations
+- [ ] Set up data cataloging and metadata management
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Author
+
+**Peter Gatitu Mwangi**  
+Data & Analytics Engineer
+
+- Email: [Petergatitu61@gmail.com]
+
+
+## Acknowledgments
+
+- Apache Airflow community for orchestration capabilities
+- Snowflake for providing a robust data warehouse platform
+- The Community Health Workers who generate the data that makes this project possible
+
+---
+
+*Last Updated: September 2025*
